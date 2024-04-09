@@ -135,3 +135,11 @@ conda/
 
 # Jetbrains idea folder
 .idea/
+
+venv/
+
+cublas64_12.dll
+
+cublasLt64_12.dll
+
+cudart64_12.dll
