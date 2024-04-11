@@ -1,0 +1,1 @@
+call .\venv\Scripts\activate.bat && cd "%~dp0" && make_pyinstaller_hybrid_henk.bat
