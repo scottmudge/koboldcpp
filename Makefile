@@ -114,10 +114,10 @@ ifeq ($(UNAME_M),$(filter $(UNAME_M),x86_64 i686))
 	# Use all CPU extensions that are available:
 # old library NEEDS mf16c to work. so we must build with it. new one doesnt
 	ifeq ($(OS),Windows_NT)
-		CFLAGS += -march=native -mtune=native
+		CFLAGS += -march=native -mtune=native -flto=auto
 		NONECFLAGS +=
-		SIMPLECFLAGS += -mavx -msse3 -mavx2 -mavx512vbmi2 -march=native -mtune=native
-		FULLCFLAGS += -mavx2 -msse3 -mfma -mf16c -mavx -mavx512vbmi2 -march=native -mtune=native
+		SIMPLECFLAGS += -mavx -msse3 -mavx2 -mavx512vbmi2 -march=native -mtune=native -flto=auto
+		FULLCFLAGS += -mavx2 -msse3 -mfma -mf16c -mavx -mavx512vbmi2 -march=native -mtune=native -flto=auto
 	else
 # if not on windows, they are clearly building it themselves, so lets just use whatever is supported
 		ifdef LLAMA_PORTABLE
