@@ -90,6 +90,11 @@ class Keys:
         HF_JSON          = "tokenizer.huggingface.json"
         RWKV             = "tokenizer.rwkv.world"
         CHAT_TEMPLATE    = "tokenizer.chat_template"
+        # FIM/Infill special tokens constants
+        PREFIX_ID        = "tokenizer.ggml.prefix_token_id"
+        SUFFIX_ID        = "tokenizer.ggml.suffix_token_id"
+        MIDDLE_ID        = "tokenizer.ggml.middle_token_id"
+        EOT_ID           = "tokenizer.ggml.eot_token_id"
 
 
 #
@@ -126,6 +131,7 @@ class MODEL_ARCH(IntEnum):
     MAMBA      = auto()
     XVERSE     = auto()
     COMMAND_R  = auto()
+    DBRX       = auto()
 
 
 class MODEL_TENSOR(IntEnum):
@@ -195,6 +201,7 @@ MODEL_ARCH_NAMES: dict[MODEL_ARCH, str] = {
     MODEL_ARCH.MAMBA:          "mamba",
     MODEL_ARCH.XVERSE:         "xverse",
     MODEL_ARCH.COMMAND_R:      "command-r",
+    MODEL_ARCH.DBRX:           "dbrx",
 }
 
 TENSOR_NAMES: dict[MODEL_TENSOR, str] = {
@@ -642,6 +649,19 @@ MODEL_TENSORS: dict[MODEL_ARCH, list[MODEL_TENSOR]] = {
         MODEL_TENSOR.ATTN_K_NORM,
         MODEL_TENSOR.ATTN_Q_NORM,
     ],
+    MODEL_ARCH.DBRX: [
+        MODEL_TENSOR.TOKEN_EMBD,
+        MODEL_TENSOR.OUTPUT_NORM,
+        MODEL_TENSOR.OUTPUT,
+        MODEL_TENSOR.ATTN_NORM,
+        MODEL_TENSOR.ATTN_QKV,
+        MODEL_TENSOR.ATTN_OUT,
+        MODEL_TENSOR.ATTN_OUT_NORM,
+        MODEL_TENSOR.FFN_GATE_INP,
+        MODEL_TENSOR.FFN_GATE_EXP,
+        MODEL_TENSOR.FFN_DOWN_EXP,
+        MODEL_TENSOR.FFN_UP_EXP,
+    ],
     # TODO
 }
 
@@ -870,3 +890,7 @@ KEY_TOKENIZER_CLS_ID     = Keys.Tokenizer.CLS_ID
 KEY_TOKENIZER_MASK_ID    = Keys.Tokenizer.MASK_ID
 KEY_TOKENIZER_HF_JSON    = Keys.Tokenizer.HF_JSON
 KEY_TOKENIZER_RWKV       = Keys.Tokenizer.RWKV
+KEY_TOKENIZER_PRIFIX_ID  = Keys.Tokenizer.PREFIX_ID
+KEY_TOKENIZER_SUFFIX_ID  = Keys.Tokenizer.SUFFIX_ID
+KEY_TOKENIZER_MIDDLE_ID  = Keys.Tokenizer.MIDDLE_ID
+KEY_TOKENIZER_EOT_ID     = Keys.Tokenizer.EOT_ID

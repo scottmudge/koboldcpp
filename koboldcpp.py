@@ -622,7 +622,7 @@ maxhordelen = 256
 modelbusy = threading.Lock()
 requestsinqueue = 0
 defaultport = 5001
-KcppVersion = "1.62.2"
+KcppVersion = "1.63"
 showdebug = True
 showsamplerwarning = True
 showmaxctxwarning = True
@@ -1155,8 +1155,12 @@ Enter Prompt:<br>
 
     def do_POST(self):
         global modelbusy, requestsinqueue, currentusergenkey, totalgens, pendingabortkey
-        content_length = int(self.headers['content-length'])
-        body = self.rfile.read(content_length)
+        contlenstr = self.headers['content-length']
+        content_length = 0
+        body = None
+        if contlenstr:
+            content_length = int(contlenstr)
+            body = self.rfile.read(content_length)
         self.path = self.path.rstrip('/')
         response_body = None
         response_code = 200
@@ -1293,7 +1297,13 @@ Enter Prompt:<br>
                     genparams = json.loads(body)
                 except Exception as e:
                     utfprint("Body Err: " + str(body))
-                    return self.send_response(503)
+                    self.send_response(500)
+                    self.end_headers(content_type='application/json')
+                    self.wfile.write(json.dumps({"detail": {
+                    "msg": "Error parsing input.",
+                    "type": "bad_input",
+                    }}).encode())
+                    return
 
                 is_quiet = args.quiet
                 if (args.debugmode != -1 and not is_quiet) or args.debugmode >= 1:
@@ -1364,9 +1374,18 @@ Enter Prompt:<br>
             self.send_header('content-type', content_type)
         return super(ServerRequestHandler, self).end_headers()
 
+def is_port_in_use(portNum):
+    try:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', portNum)) == 0
+    except Exception as ex:
+        return True
 
 def RunServerMultiThreaded(addr, port, embedded_kailite = None, embedded_kcpp_docs = None):
     global exitcounter, sslvalid
+    if is_port_in_use(port):
+        print(f"Warning: Port {port} already appears to be in use by another program.")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if args.ssl and sslvalid:
@@ -2744,7 +2763,8 @@ def delete_old_pyinstaller():
             if absdirpath!=selfdirpath and (time.time() - os.path.getctime(absdirpath)) > 14400: # remove if older than 4 hours
                 kobold_itemcheck1 = os.path.join(absdirpath, 'koboldcpp_default.dll')
                 kobold_itemcheck2 = os.path.join(absdirpath, 'koboldcpp_default.so')
-                if os.path.exists(kobold_itemcheck1) or os.path.exists(kobold_itemcheck2):
+                kobold_itemcheck3 = os.path.join(absdirpath, 'klite.embd')
+                if os.path.exists(kobold_itemcheck1) or os.path.exists(kobold_itemcheck2) or os.path.exists(kobold_itemcheck3):
                     try:
                         shutil.rmtree(absdirpath)
                         print(f"Deleted orphaned pyinstaller dir: {absdirpath}")
