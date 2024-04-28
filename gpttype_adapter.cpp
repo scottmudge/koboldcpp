@@ -429,9 +429,15 @@ void sample_rep_pen(int n_ctx, int rep_pen_range, float rep_pen, float presence_
 
     const int64_t t_start_sample_us = ggml_time_us();
 
+    // Create a frequency map to count occurrences of each token in last_tokens
+    std::unordered_map<llama_token, int> token_count;
+    for (size_t i = 0; i < last_n_repeat; ++i) {
+        token_count[last_tokens[i]]++;
+    }
+
     for (size_t i = 0; i < candidates->size; ++i) {
-        const auto * token_iter = std::find(last_tokens, last_tokens + last_tokens_size, candidates->data[i].id);
-        if (token_iter == last_tokens + last_tokens_size) {
+        const auto token_iter = token_count.find(candidates->data[i].id);
+        if (token_iter == token_count.end()) {
             continue;
         }
 
@@ -830,17 +836,6 @@ ModelLoadResult gpttype_load_model(const load_model_inputs inputs, FileFormat in
     }
     gptj_ctx_v3.hparams.rope_freq_scale = neox_ctx_v3.hparams.rope_freq_scale = rope_freq_scale;
     gptj_ctx_v3.hparams.rope_freq_base = neox_ctx_v3.hparams.rope_freq_base = rope_freq_base;
-
-    //handle custom token bans
-    banned_tokens.clear();
-    for(int x=0;x<ban_token_max;++x)
-    {
-        std::string word = inputs.banned_tokens[x];
-        if(word!="")
-        {
-            banned_tokens.push_back(word);
-        }
-    }
 
     //this is used for the mem_per_token eval, openblas needs more RAM
     bool v3_use_scratch = ggml_v3_cpu_has_gpublas();
@@ -1578,6 +1573,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
         printf("\nWarning: KCPP text generation not initialized!\n");
         output.text = nullptr;
         output.status = 0;
+        output.stopreason = stop_reason::INVALID;
         generation_finished = true;
         return output;
     }
@@ -1614,6 +1610,41 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                     special_stop_sequence.push_back(specialid);
                 }
             }
+        }
+    }
+
+    //handle custom token bans
+    banned_tokens.clear();
+    for(int x=0;x<ban_token_max;++x)
+    {
+        std::string word = inputs.banned_tokens[x];
+        if(word!="")
+        {
+            banned_tokens.push_back(word);
+        }
+    }
+    banned_token_ids.clear();
+    if(banned_tokens.size()>0)
+    {
+        if(debugmode==1)
+        {
+            printf("\nBanning %zu token sequences...",banned_tokens.size());
+        }
+        for(int v=0;v<n_vocab;++v)
+        {
+            std::string word = FileFormatTokenizeID(v,file_format, true);
+            for(int i=0;i<banned_tokens.size();++i)
+            {
+                if (word.find(banned_tokens[i]) != std::string::npos)
+                {
+                    banned_token_ids.push_back(v);
+                    break;
+                }
+            }
+        }
+        if(debugmode==1)
+        {
+            printf("\nBanned a total of %zu tokens.\n",banned_token_ids.size());
         }
     }
 
@@ -1870,6 +1901,14 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     std::fill(last_n_tokens.begin(), last_n_tokens.end(), 0);
     n_past = 0;
 
+    if (debugmode==1)
+    {
+        std::string outstr = "";
+        printf("\n\n[Debug: Dump Raw Input Tokens, format: %d]\n", file_format);
+        outstr += get_tok_vec_str(embd_inp);
+        printf("%s\n", RemoveBell(outstr).c_str());
+    }
+
     bool is_mamba = (file_format == FileFormat::GGUF_GENERIC && file_format_meta.model_architecture==GGUFArch::ARCH_MAMBA);
 
     if (file_format == FileFormat::RWKV_1 || file_format==FileFormat::RWKV_2 || is_mamba)
@@ -1978,25 +2017,6 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
         printf("\nWarning! n_vocab is invalid, maybe bad format!");
     }
 
-    //prepare banned tokens
-    if(banned_token_ids.size()==0 && banned_tokens.size()>0)
-    {
-        printf("\n[First Run] Banning %zu token sequences...",banned_tokens.size());
-        for(int v=0;v<n_vocab;++v)
-        {
-            std::string word = FileFormatTokenizeID(v,file_format, true);
-            for(int i=0;i<banned_tokens.size();++i)
-            {
-                if (word.find(banned_tokens[i]) != std::string::npos)
-                {
-                    banned_token_ids.push_back(v);
-                    break;
-                }
-            }
-        }
-        printf("\nBanned a total of %zu tokens.\n",banned_token_ids.size());
-    }
-
     if(allow_regular_prints)
     {
         printf("\n");
@@ -2005,7 +2025,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     if (debugmode==1)
     {
         std::string outstr = "";
-        printf("\n[Debug: Dump Input Tokens, format: %d]\n", file_format);
+        printf("\n[Debug: Dump Forwarded Input Tokens, format: %d]\n", file_format);
         outstr += get_tok_vec_str(embd_inp);
         outstr += "\n\n[Debug: n_past="+std::to_string(n_past)+" Context Size = " + std::to_string(current_context_tokens.size()) + "]\n";
         outstr += get_tok_vec_str(current_context_tokens);
@@ -2111,6 +2131,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                 fprintf(stderr, "\nFailed to predict at %d! Check your context buffer sizes!\n",n_past);
                 output.text = nullptr;
                 output.status = 0;
+                output.stopreason = stop_reason::INVALID;
                 generation_finished = true;
                 return output;
             }
@@ -2320,6 +2341,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                                 fprintf(stderr, "\nFailed to eval llava image at %d!\n",n_past);
                                 output.text = nullptr;
                                 output.status = 0;
+                                output.stopreason = stop_reason::INVALID;
                                 generation_finished = true;
                                 return output;
                             }
@@ -2330,6 +2352,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
                             fprintf(stderr, "\nLLAVA image tokens mismatch at %d! (%d vs %d tokens)\n",n_past,llavatokenscounted,llavatokensevaled);
                             output.text = nullptr;
                             output.status = 0;
+                            output.stopreason = stop_reason::INVALID;
                             generation_finished = true;
                             return output;
                         }
@@ -2367,6 +2390,7 @@ generation_outputs gpttype_generate(const generation_inputs inputs)
     printf("\nCtxLimit: %d/%d, Process:%.2fs (%.1fms/T = %.2fT/s), Generate:%.2fs (%.1fms/T = %.2fT/s), Total:%.2fs (%.2fT/s)",(int)current_context_tokens.size(),(int)nctx, time1, pt1, ts1, time2, pt2, ts2, (time1 + time2), tokens_per_second);
     fflush(stdout);
     output.status = 1;
+    output.stopreason = last_stop_reason;
     generation_finished = true;
     last_eval_time = pt2;
     last_process_time = pt1;
