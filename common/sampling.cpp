@@ -69,7 +69,7 @@ void llama_sampling_reset(llama_sampling_context * ctx) {
 
 void llama_sampling_set_rng_seed(struct llama_sampling_context * ctx, uint32_t seed) {
     if (seed == LLAMA_DEFAULT_SEED) {
-        seed = static_cast<uint32_t>(std::chrono::system_clock::now().time_since_epoch().count());
+        seed = std::random_device{}();
     }
     ctx->rng.seed(seed);
 }
