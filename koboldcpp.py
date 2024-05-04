@@ -636,7 +636,7 @@ maxhordelen = 256
 modelbusy = threading.Lock()
 requestsinqueue = 0
 defaultport = 5001
-KcppVersion = "1.64"
+KcppVersion = "1.64.1"
 showdebug = True
 showsamplerwarning = True
 showmaxctxwarning = True
@@ -748,7 +748,7 @@ def transform_genparams(genparams, api_format):
     elif api_format==5:
         firstimg = genparams.get('image', "")
         genparams["images"] = [firstimg]
-        genparams["max_length"] = 32
+        genparams["max_length"] = 42
         genparams["prompt"] = "### Instruction: In one sentence, write a descriptive caption for this image.\n### Response:"
 
     return genparams
@@ -3069,7 +3069,7 @@ def main(launch_args,start_server=True):
         print(args)
         # Flush stdout for win32 issue with regards to piping in terminals,
         # especially before handing over to C++ context.
-        print(f"==========\nLoading model: {modelname} \n[Threads: {args.threads}, BlasThreads: {args.blasthreads}, SmartContext: {args.smartcontext}, ContextShift: {not (args.noshift)}]", flush=True)
+        print(f"==========\nLoading model: {modelname}", flush=True)
         loadok = load_model(modelname)
         print("Load Text Model OK: " + str(loadok))
 
