@@ -12490,7 +12490,7 @@ struct llm_tokenizer_bpe {
                             //"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+",
 
                             // adapted: https://github.com/ggerganov/llama.cpp/pull/6920#issuecomment-2080233989
-                            "(?:'[sS]|'[tT]|'[rR][eE]|'[vV][eE]|'[mM]|'[lL][lL]|'[dD])|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+",
+                            "(?:'s|'S|'t|'T|'re|'Re|'rE|'RE|'ve|'vE|'Ve|'m|'M|'ll|'Ll|'lL|'LL|'d|'D)|[^\\r\\n\\p{L}\\p{N}]?\\p{L}+|\\p{N}{1,3}| ?[^\\s\\p{L}\\p{N}]+[\\r\\n]*|\\r?\\n\\r?\\n\\r?\\n|\\r?\\n\\r?\\n|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+",
                         });
                         break;
                     case LLAMA_VOCAB_PRE_TYPE_DEEPSEEK_LLM:
