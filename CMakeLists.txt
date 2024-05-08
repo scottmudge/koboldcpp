@@ -30,9 +30,9 @@ set(LLAMA_SANITIZE_UNDEFINED OFF)
 # instruction set specific
 option(LLAMA_AVX                    "llama: enable AVX"                                     ON)
 option(LLAMA_AVX2                   "llama: enable AVX2"                                    ON)
-option(LLAMA_AVX512                 "llama: enable AVX512"                                  ON)
-option(LLAMA_AVX512_VBMI            "llama: enable AVX512-VBMI"                             ON)
-option(LLAMA_AVX512_VNNI            "llama: enable AVX512-VNNI"                             ON)
+option(LLAMA_AVX512                 "llama: enable AVX512"                                  OFF)
+option(LLAMA_AVX512_VBMI            "llama: enable AVX512-VBMI"                             OFF)
+option(LLAMA_AVX512_VNNI            "llama: enable AVX512-VNNI"                             OFF)
 option(LLAMA_FMA                    "llama: enable FMA"                                     ON)
 # in MSVC F16C is implied with AVX2/AVX512
 if (NOT MSVC)
