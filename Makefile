@@ -125,12 +125,12 @@ ifeq ($(UNAME_M),$(filter $(UNAME_M),x86_64 i686))
 	else
 # if not on windows, they are clearly building it themselves, so lets just use whatever is supported
 		ifdef LLAMA_PORTABLE
-		CFLAGS +=
+		CFLAGS += -mavx -msse3 -mavx2 -march=native -mtune=native
 		NONECFLAGS +=
-		SIMPLECFLAGS += -mavx -msse3
-		FULLCFLAGS += -mavx2 -msse3 -mfma -mf16c -mavx
+		SIMPLECFLAGS += -mavx -msse3 -mavx2 -march=native -mtune=native
+		FULLCFLAGS += -mavx2 -msse3 -mfma -mf16c -mavx -mavx2 -march=native -mtune=native
 		else
-		CFLAGS += -march=native -mtune=native
+		CFLAGS += -mavx -msse3 -mavx2 -march=native -mtune=native
 		endif
 	endif
 endif
