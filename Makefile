@@ -151,7 +151,7 @@ ifdef LLAMA_CUBLAS
 	CUBLAS_OBJS = ggml-cuda.o ggml_v3-cuda.o ggml_v2-cuda.o ggml_v2-cuda-legacy.o
 	CUBLAS_OBJS += $(patsubst %.cu,%.o,$(wildcard ggml-cuda/*.cu))
 	NVCC      = nvcc
-	NVCCFLAGS = --forward-unknown-to-host-compiler -use_fast_math
+	NVCCFLAGS = --forward-unknown-to-host-compiler -use_fast_math -O3 -Xptxas -O3 
 
 ifdef LLAMA_ADD_CONDA_PATHS
 	CUBLASLD_FLAGS += -Lconda/envs/linux/lib -Lconda/envs/linux/lib/stubs
@@ -162,12 +162,12 @@ ifdef CUDA_DOCKER_ARCH
 else
 ifdef LLAMA_PORTABLE
 ifdef LLAMA_COLAB #colab does not need all targets, all-major doesnt work correctly with pascal
-	NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=all-major
+	NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=sm_61
 else
-	NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=all
+	NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=sm_61
 endif #LLAMA_COLAB
 else
-	NVCCFLAGS += -arch=native
+	NVCCFLAGS += -arch=sm_61
 endif #LLAMA_PORTABLE
 endif # CUDA_DOCKER_ARCH
 
