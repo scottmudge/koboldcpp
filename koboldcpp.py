@@ -107,6 +107,10 @@ class sd_load_model_inputs(ctypes.Structure):
                 ("vulkan_info", ctypes.c_char_p),
                 ("threads", ctypes.c_int),
                 ("quant", ctypes.c_int),
+                ("taesd", ctypes.c_bool),
+                ("vae_filename", ctypes.c_char_p),
+                ("lora_filename", ctypes.c_char_p),
+                ("lora_multiplier", ctypes.c_float),
                 ("debugmode", ctypes.c_int)]
 
 class sd_generation_inputs(ctypes.Structure):
@@ -120,6 +124,7 @@ class sd_generation_inputs(ctypes.Structure):
                 ("height", ctypes.c_int),
                 ("seed", ctypes.c_int),
                 ("sample_method", ctypes.c_char_p),
+                ("clip_skip", ctypes.c_int),
                 ("quiet", ctypes.c_bool)]
 
 class sd_generation_outputs(ctypes.Structure):
@@ -512,7 +517,7 @@ def generate(prompt, memory="", images=[], max_length=32, max_context_length=512
         return {"text":outstr,"status":ret.status,"stopreason":ret.stopreason}
 
 
-def sd_load_model(model_filename):
+def sd_load_model(model_filename,vae_filename,lora_filename):
     global args
     inputs = sd_load_model_inputs()
     inputs.debugmode = args.debugmode
@@ -529,6 +534,10 @@ def sd_load_model(model_filename):
 
     inputs.threads = thds
     inputs.quant = quant
+    inputs.taesd = True if args.sdvaeauto else False
+    inputs.vae_filename = vae_filename.encode("UTF-8")
+    inputs.lora_filename = lora_filename.encode("UTF-8")
+    inputs.lora_multiplier = args.sdloramult
     inputs = set_backend_props(inputs)
     ret = handle.sd_load_model(inputs)
     return ret
@@ -547,6 +556,7 @@ def sd_generate(genparams):
     seed = genparams.get("seed", -1)
     sample_method = genparams.get("sampler_name", "k_euler_a")
     is_quiet = True if args.quiet else False
+    clip_skip = genparams.get("clip_skip", -1)
 
     #clean vars
     width = width - (width%64)
@@ -582,6 +592,7 @@ def sd_generate(genparams):
     inputs.seed = seed
     inputs.sample_method = sample_method.lower().encode("UTF-8")
     inputs.quiet = is_quiet
+    inputs.clip_skip = clip_skip
     ret = handle.sd_generate(inputs)
     outstr = ""
     if ret.status==1:
@@ -631,7 +642,7 @@ maxhordelen = 256
 modelbusy = threading.Lock()
 requestsinqueue = 0
 defaultport = 5001
-KcppVersion = "1.65"
+KcppVersion = "1.65.1"
 showdebug = True
 showsamplerwarning = True
 showmaxctxwarning = True
@@ -3154,12 +3165,25 @@ def main(launch_args,start_server=True):
                 time.sleep(3)
                 sys.exit(2)
         else:
+            imglora = ""
+            imgvae = ""
+            if args.sdlora:
+                if os.path.exists(args.sdlora):
+                    imglora = os.path.abspath(args.sdlora)
+                else:
+                    print(f"Missing SD LORA model file...")
+            if args.sdvae:
+                if os.path.exists(args.sdvae):
+                    imgvae = os.path.abspath(args.sdvae)
+                else:
+                    print(f"Missing SD VAE model file...")
+
             imgmodel = os.path.abspath(imgmodel)
             fullsdmodelpath = imgmodel
             friendlysdmodelname = os.path.basename(imgmodel)
             friendlysdmodelname = os.path.splitext(friendlysdmodelname)[0]
             friendlysdmodelname = sanitize_string(friendlysdmodelname)
-            loadok = sd_load_model(imgmodel)
+            loadok = sd_load_model(imgmodel,imgvae,imglora)
             print("Load Image Model OK: " + str(loadok))
             if not loadok:
                 exitcounter = 999
@@ -3266,7 +3290,6 @@ def main(launch_args,start_server=True):
         genout = generate(benchprompt,memory="",images=[],max_length=benchlen,max_context_length=benchmaxctx,temperature=0.1,top_k=1,rep_pen=1,use_default_badwordsids=True)
         result = genout['text']
         result = (result[:5] if len(result)>5 else "")
-        resultok = (result=="11111")
         t_pp = float(handle.get_last_process_time())*float(benchmaxctx-benchlen)*0.001
         t_gen = float(handle.get_last_eval_time())*float(benchlen)*0.001
         s_pp = float(benchmaxctx-benchlen)/t_pp
@@ -3284,15 +3307,14 @@ def main(launch_args,start_server=True):
         print(f"GenerationTime: {t_gen:.2f}s")
         print(f"GenerationSpeed: {s_gen:.2f}T/s")
         print(f"TotalTime: {(t_pp+t_gen):.2f}s")
-        print(f"Coherent: {resultok}")
         print(f"Output: {result}\n-----")
         if save_to_file:
             try:
                 with open(args.benchmark, "a") as file:
                     file.seek(0, 2)
                     if file.tell() == 0: #empty file
-                        file.write(f"Timestamp,Backend,Layers,Model,MaxCtx,GenAmount,ProcessingTime,ProcessingSpeed,GenerationTime,GenerationSpeed,TotalTime,Coherent,Output")
-                    file.write(f"\n{datetimestamp},{libname},{args.gpulayers},{benchmodel},{benchmaxctx},{benchlen},{t_pp:.2f},{s_pp:.2f},{t_gen:.2f},{s_gen:.2f},{(t_pp+t_gen):.2f},{resultok},{result}")
+                        file.write(f"Timestamp,Backend,Layers,Model,MaxCtx,GenAmount,ProcessingTime,ProcessingSpeed,GenerationTime,GenerationSpeed,TotalTime,Output")
+                    file.write(f"\n{datetimestamp},{libname},{args.gpulayers},{benchmodel},{benchmaxctx},{benchlen},{t_pp:.2f},{s_pp:.2f},{t_gen:.2f},{s_gen:.2f},{(t_pp+t_gen):.2f},{result}")
             except Exception as e:
                 print(f"Error writing benchmark to file: {e}")
         global using_gui_launcher
@@ -3393,7 +3415,7 @@ if __name__ == '__main__':
     advparser.add_argument("--highpriority", help="Experimental flag. If set, increases the process CPU priority, potentially speeding up generation. Use caution.", action='store_true')
     advparser.add_argument("--foreground", help="Windows only. Sends the terminal to the foreground every time a new prompt is generated. This helps avoid some idle slowdown issues.", action='store_true')
     advparser.add_argument("--preloadstory", help="Configures a prepared story json save file to be hosted on the server, which frontends (such as Kobold Lite) can access over the API.", default="")
-    advparser.add_argument("--quiet", help="Enable quiet mode, which hides generation inputs and outputs in the terminal. Quiet mode is automatically enabled when running --hordeconfig.", action='store_true')
+    advparser.add_argument("--quiet", help="Enable quiet mode, which hides generation inputs and outputs in the terminal. Quiet mode is automatically enabled when running a horde worker.", action='store_true')
     advparser.add_argument("--ssl", help="Allows all content to be served over SSL instead. A valid UNENCRYPTED SSL cert and key .pem files must be provided", metavar=('[cert_pem]', '[key_pem]'), nargs='+')
     advparser.add_argument("--nocertify", help="Allows insecure SSL connections. Use this if you have cert errors and need to bypass certificate restrictions.", action='store_true')
     advparser.add_argument("--mmproj", help="Select a multimodal projector file for LLaVA.", default="")
@@ -3416,6 +3438,11 @@ if __name__ == '__main__':
     sdparsergroup.add_argument("--sdthreads", metavar=('[threads]'), help="Use a different number of threads for image generation if specified. Otherwise, has the same value as --threads.", type=int, default=0)
     sdparsergroup.add_argument("--sdquant", help="If specified, loads the model quantized to save memory.", action='store_true')
     sdparsergroup.add_argument("--sdclamped", help="If specified, limit generation steps and resolution settings for shared use.", action='store_true')
+    sdparsergroupvae = sdparsergroup.add_mutually_exclusive_group()
+    sdparsergroupvae.add_argument("--sdvae", metavar=('[filename]'), help="Specify a stable diffusion safetensors VAE which replaces the one in the model.", default="")
+    sdparsergroupvae.add_argument("--sdvaeauto", help="Uses a built-in VAE via TAE SD, which is very fast.", action='store_true')
+    sdparsergroup.add_argument("--sdlora", metavar=('[filename]'), help="Specify a stable diffusion LORA safetensors model to be applied.", default="")
+    sdparsergroup.add_argument("--sdloramult", metavar=('[amount]'), help="Multiplier for the LORA model to be applied.", type=float, default=1.0)
 
     deprecatedgroup = parser.add_argument_group('Deprecated Commands, DO NOT USE!')
     deprecatedgroup.add_argument("--hordeconfig", help=argparse.SUPPRESS, nargs='+')
