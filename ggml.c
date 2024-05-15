@@ -3181,6 +3181,12 @@ static struct ggml_tensor * ggml_new_tensor_impl(
 
     struct ggml_tensor * const result = (struct ggml_tensor *)((char *)ctx->mem_buffer + obj_new->offs);
 
+#ifdef __clang__
+    // temporary until ggml_tensor::backend is removed
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
     *result = (struct ggml_tensor) {
         /*.type         =*/ type,
         /*.backend      =*/ GGML_BACKEND_TYPE_CPU,
@@ -3202,6 +3208,10 @@ static struct ggml_tensor * ggml_new_tensor_impl(
         /*.extra        =*/ NULL,
         /*.padding      =*/ { 0 },
     };
+
+#ifdef __clang__
+    #pragma clang diagnostic pop
+#endif
 
     // TODO: this should not be needed as long as we don't rely on aligned SIMD loads
     //ggml_assert_aligned(result->data);
@@ -6296,7 +6306,10 @@ struct ggml_tensor * ggml_pool_2d(
 static struct ggml_tensor * ggml_upscale_impl(
     struct ggml_context * ctx,
     struct ggml_tensor * a,
-    int scale_factor) {
+    int ne0,
+    int ne1,
+    int ne2,
+    int ne3) {
     bool is_node = false;
 
     if (a->grad) {
@@ -6304,18 +6317,44 @@ static struct ggml_tensor * ggml_upscale_impl(
         is_node = true;
     }
 
+    GGML_ASSERT(a->ne[0] <= ne0);
+    GGML_ASSERT(a->ne[1] <= ne1);
+    GGML_ASSERT(a->ne[2] <= ne2);
+    GGML_ASSERT(a->ne[3] <= ne3);
+
     struct ggml_tensor * result = ggml_new_tensor_4d(ctx, a->type,
-            a->ne[0] * scale_factor,
-            a->ne[1] * scale_factor,
-            a->ne[2], a->ne[3]);
+            ne0,
+            ne1,
+            ne2,
+            ne3
+            );
 
     result->op = GGML_OP_UPSCALE;
-    result->op_params[0] = scale_factor;
+
     result->grad = is_node ? ggml_dup_tensor(ctx, result) : NULL;
     result->src[0] = a;
 
     return result;
 }
+
+struct ggml_tensor * ggml_upscale(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int scale_factor) {
+    return ggml_upscale_impl(ctx, a, a->ne[0] * scale_factor, a->ne[1] * scale_factor, a->ne[2], a->ne[3]);
+}
+
+struct ggml_tensor * ggml_upscale_ext(
+    struct ggml_context * ctx,
+    struct ggml_tensor * a,
+    int ne0,
+    int ne1,
+    int ne2,
+    int ne3) {
+    return ggml_upscale_impl(ctx, a, ne0, ne1, ne2, ne3);
+}
+
+// ggml_pad
 
 struct ggml_tensor * ggml_pad(
     struct ggml_context * ctx,
@@ -6341,12 +6380,7 @@ struct ggml_tensor * ggml_pad(
     return result;
 }
 
-struct ggml_tensor * ggml_upscale(
-    struct ggml_context * ctx,
-    struct ggml_tensor * a,
-    int scale_factor) {
-    return ggml_upscale_impl(ctx, a, scale_factor);
-}
+// ggml_arange
 
 struct ggml_tensor * ggml_arange(
     struct ggml_context * ctx,
@@ -6367,6 +6401,8 @@ struct ggml_tensor * ggml_arange(
 
     return result;
 }
+
+// ggml_timestep_embedding
 
 struct ggml_tensor * ggml_timestep_embedding(
             struct ggml_context * ctx,
@@ -14823,25 +14859,28 @@ static void ggml_compute_forward_upscale_f32(
         return;
     }
 
-    GGML_ASSERT(src0->nb[0] == sizeof(float));
+    GGML_ASSERT(src0->type == GGML_TYPE_F32);
 
     const int ith = params->ith;
     const int nth = params->nth;
 
     GGML_TENSOR_UNARY_OP_LOCALS
 
-    const int scale_factor = dst->op_params[0];
+    const float sf0 = (float)ne0/src0->ne[0];
+    const float sf1 = (float)ne1/src0->ne[1];
+    const float sf2 = (float)ne2/src0->ne[2];
+    const float sf3 = (float)ne3/src0->ne[3];
 
     // TODO: optimize
 
     for (int64_t i3 = 0; i3 < ne3; i3++) {
-        const int64_t i03 = i3;
+        const int64_t i03 = i3 / sf3;
         for (int64_t i2 = ith; i2 < ne2; i2 += nth) {
-            const int64_t i02 = i2;
+            const int64_t i02 = i2 / sf2;
             for (int64_t i1 = 0; i1 < ne1; i1++) {
-                const int64_t i01 = i1 / scale_factor;
+                const int64_t i01 = i1 / sf1;
                 for (int64_t i0 = 0; i0 < ne0; i0++) {
-                    const int64_t i00 = i0 / scale_factor;
+                    const int64_t i00 = i0 / sf0;
 
                     const float * x = (float *)((char *) src0->data + i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03);
                           float * y = (float *)((char *)  dst->data +  i0*nb0  +  i1*nb1  +  i2*nb2  +  i3*nb3);
@@ -14870,6 +14909,7 @@ static void ggml_compute_forward_upscale(
             } break;
     }
 }
+
 
 // ggml_compute_forward_pad
 
