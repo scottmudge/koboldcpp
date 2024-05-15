@@ -130,7 +130,7 @@ ifeq ($(UNAME_M),$(filter $(UNAME_M),x86_64 i686))
 		SIMPLECFLAGS += -mavx -msse3 -mavx2 -march=native -mtune=native
 		FULLCFLAGS += -mavx2 -msse3 -mfma -mf16c -mavx -mavx2 -march=native -mtune=native
 		else
-		CFLAGS += -mavx -msse3 -mavx2 -march=native -mtune=native
+		CFLAGS += -mavx -mavx2 -msse3 -mfma -mf16c -mabm -mbmi -mbmi2 -mno-fma4 -msse4.1 -msse4.2 -malign-double -march=native -mtune=native
 		endif
 	endif
 endif
@@ -167,7 +167,7 @@ else
 	NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=all
 endif #LLAMA_COLAB
 else
-	NVCCFLAGS += -arch=native
+	NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=sm_61
 endif #LLAMA_PORTABLE
 endif # CUDA_DOCKER_ARCH
 
