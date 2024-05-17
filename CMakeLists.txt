@@ -296,26 +296,7 @@ endif()
 if ((${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm") OR (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64"))
     message(STATUS "ARM detected")
     if (MSVC)
-        add_compile_definitions(__aarch64__) # MSVC defines _M_ARM64 instead
-        add_compile_definitions(__ARM_NEON)
-        add_compile_definitions(__ARM_FEATURE_FMA)
-
-        set(CMAKE_REQUIRED_FLAGS_PREV ${CMAKE_REQUIRED_FLAGS})
-        string(JOIN " " CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} "/arch:armv8.2")
-        check_cxx_source_compiles("#include <arm_neon.h>\nint main() { int8x16_t _a, _b; int32x4_t _s = vdotq_s32(_s, _a, _b); return 0; }" GGML_COMPILER_SUPPORT_DOTPROD)
-        if (GGML_COMPILER_SUPPORT_DOTPROD)
-            add_compile_definitions(__ARM_FEATURE_DOTPROD)
-        endif ()
-        check_cxx_source_compiles("#include <arm_neon.h>\nint main() { int8x16_t _a, _b; int32x4_t _s = vmlaq_f32(_s, _a, _b); return 0; }" GGML_COMPILER_SUPPORT_MATMUL_INT8)
-        if (GGML_COMPILER_SUPPORT_MATMUL_INT8)
-            add_compile_definitions(__ARM_FEATURE_MATMUL_INT8)
-        endif ()
-
-        check_cxx_source_compiles("#include <arm_neon.h>\nint main() { float16_t _a; float16x8_t _s = vdupq_n_f16(_a); return 0; }" GGML_COMPILER_SUPPORT_FP16_VECTOR_ARITHMETIC)
-        if (GGML_COMPILER_SUPPORT_FP16_VECTOR_ARITHMETIC)
-            add_compile_definitions(__ARM_FEATURE_FP16_VECTOR_ARITHMETIC)
-        endif ()
-        set(CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS_PREV})
+        # TODO: arm msvc?
     else()
         if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "armv6")
             # Raspberry Pi 1, Zero
