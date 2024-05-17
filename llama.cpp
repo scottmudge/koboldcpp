@@ -13109,6 +13109,13 @@ static std::vector<llama_vocab::id> llama_tokenize_internal(const llama_vocab & 
                     }
                 }
 
+                if (add_special && vocab.special_add_bos != 0 && output.size() >= 2 && output[1] == vocab.special_bos_id) {
+                    LLAMA_LOG_WARN(
+                        "%s: Added a BOS token to the prompt as specified by the model but the prompt "
+                        "also starts with a BOS token. So now the final prompt starts with 2 BOS tokens. "
+                        "Are you sure this is what you want?\n", __FUNCTION__);
+                }
+
                 if (add_special && vocab.special_add_eos == 1) {
                     GGML_ASSERT(vocab.special_eos_id != -1);
                     output.push_back(vocab.special_eos_id);
@@ -13143,6 +13150,13 @@ static std::vector<llama_vocab::id> llama_tokenize_internal(const llama_vocab & 
                     } else { // if (fragment.type == FRAGMENT_BUFFER_VARIANT_TYPE_TOKEN)
                         output.push_back(fragment.token);
                     }
+                }
+
+                if (add_special && vocab.special_add_bos != 0 && output.size() >= 2 && output[1] == vocab.special_bos_id) {
+                    LLAMA_LOG_WARN(
+                        "%s: Added a BOS token to the prompt as specified by the model but the prompt "
+                        "also starts with a BOS token. So now the final prompt starts with 2 BOS tokens. "
+                        "Are you sure this is what you want?\n", __FUNCTION__);
                 }
 
                 if (add_special && vocab.special_add_eos == 1) {
@@ -14234,9 +14248,7 @@ llama_token llama_sample_token_mirostat(struct llama_context * ctx, llama_token_
 
     // Sample the next word X using top-k sampling
     llama_sample_top_k(nullptr, candidates, int(k), 1);
-    if (ctx) {
-        ctx->t_sample_us += ggml_time_us() - t_start_sample_us;
-    }
+    ctx->t_sample_us += ggml_time_us() - t_start_sample_us;
     llama_token X = llama_sample_token(ctx, candidates);
     t_start_sample_us = ggml_time_us();
 
@@ -14250,9 +14262,7 @@ llama_token llama_sample_token_mirostat(struct llama_context * ctx, llama_token_
     // Update mu using the learning rate and error
     *mu = *mu - eta * e;
 
-    if (ctx) {
-        ctx->t_sample_us += ggml_time_us() - t_start_sample_us;
-    }
+    ctx->t_sample_us += ggml_time_us() - t_start_sample_us;
     return X;
 }
 
